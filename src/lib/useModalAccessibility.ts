@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
+import { useBodyScrollLock } from './useBodyScrollLock'
 
 export function useModalAccessibility(dialogRef:RefObject<HTMLElement|null>,onClose:()=>void,blocked=false){
   const closeRef=useRef(onClose),blockedRef=useRef(blocked)
+  useBodyScrollLock(true)
   useEffect(()=>{closeRef.current=onClose;blockedRef.current=blocked},[onClose,blocked])
   useEffect(()=>{
     const previous=document.activeElement instanceof HTMLElement?document.activeElement:null
-    const previousOverflow=document.body.style.overflow
-    document.body.style.overflow='hidden'
     const frame=window.requestAnimationFrame(()=>{
       if(!dialogRef.current?.contains(document.activeElement)){
         const target=dialogRef.current?.querySelector<HTMLElement>('[autofocus],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')
@@ -24,6 +24,6 @@ export function useModalAccessibility(dialogRef:RefObject<HTMLElement|null>,onCl
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
     }
     document.addEventListener('keydown',handleKey)
-    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);document.body.style.overflow=previousOverflow;previous?.focus()}
+    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);previous?.focus({preventScroll:true})}
   },[dialogRef])
 }

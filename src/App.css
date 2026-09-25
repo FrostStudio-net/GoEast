@@ -1,6 +1,6 @@
 :root{--bg:#11120f;--sidebar:#0c0d0b;--surface:#181916;--border:#2a2c27;--border-soft:#23251f;--text:#f2f1ed;--muted:#94978e;--muted-2:#6e7169;--gold:#d8a83f;--gold-bright:#e4b548}
 .app-shell{min-height:100vh;background:var(--bg)}
-.sidebar{position:fixed;inset:0 auto 0 0;z-index:20;width:244px;display:flex;flex-direction:column;padding:25px 15px 17px;background:var(--sidebar);border-right:1px solid #242520}
+.sidebar{position:fixed;inset:0 auto 0 0;z-index:20;width:244px;display:flex;flex-direction:column;padding:25px 15px 17px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:var(--sidebar);border-right:1px solid #242520}
 .brand-row{display:flex;align-items:center;justify-content:space-between;padding:0 10px 20px}.brand{display:flex;align-items:center;width:174px;padding:0;border:0;background:none;text-align:left;overflow:hidden}.brand-logo{display:block;width:190px;height:auto;margin:-22px -10px -23px -19px}.mobile-close{display:none;border:0;background:none}
 .nav-label,.eyebrow{margin:0;color:var(--muted-2);font-size:10px;font-weight:700;letter-spacing:1.45px}.nav-label{padding:0 12px 9px}.nav-label-spaced{padding-top:25px}.nav-item{position:relative;width:100%;height:42px;display:flex;align-items:center;gap:13px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:#91948b;font-size:13px;text-align:left;transition:.18s ease}.nav-item:hover{background:#171814;color:#d7d7d1}.nav-item.active{background:#232219;color:#f0d58f}.nav-item.active:before{content:'';position:absolute;left:0;width:2px;height:20px;border-radius:2px;background:var(--gold)}.nav-item small{margin-left:auto;color:#575a52;font-size:7px;font-weight:700;letter-spacing:.8px}
 .sidebar-footer{margin-top:auto}.help-card{display:flex;align-items:center;gap:10px;margin:12px 2px 16px;padding:12px;border:1px solid #282a24;border-radius:9px;background:#151612}.help-icon{flex:0 0 auto;width:25px;height:25px;display:grid;place-items:center;border:1px solid #51472e;border-radius:50%;color:var(--gold);font-size:12px}.help-card div,.profile>span:nth-child(2){display:flex;min-width:0;flex:1;flex-direction:column}.help-card strong,.profile strong{color:#d5d5cf;font-size:11px;font-weight:600}.help-card small,.profile small{color:#686b63;font-size:9px}.help-card>.icon{color:#55584f}.profile{width:100%;display:flex;align-items:center;gap:10px;padding:14px 9px 2px;border:0;border-top:1px solid #22231f;background:none;text-align:left}.profile>.icon{color:#55584f}.avatar,.top-avatar{display:grid;flex:0 0 auto;place-items:center;border:1px solid #544b33;border-radius:50%;background:#27251b;color:#ddbc68;font-weight:600}.avatar{width:31px;height:31px;font-size:10px}.top-avatar{width:30px;height:30px;font-size:9px}.profile strong,.profile small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -94,6 +94,18 @@
 @media screen and (max-width:340px){
   .page{padding-right:12px;padding-left:12px}.stats-grid{grid-template-columns:1fr}.stat-card{min-height:88px}.resource-row-actions button{padding:0 10px}.weather-widget{max-width:120px}.weather-widget strong{display:none}.weather-widget small{max-width:76px}
 }
+
+/* Blocking overlays own their scrolling while the shared body lock freezes the page. */
+.duration-fields{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.duration-error{grid-column:1/-1;margin-top:-4px;color:#c9877f;font-size:8.5px;font-style:normal;line-height:1.4}
+.resource-modal-scrim,.export-modal-scrim,.confirm-scrim{overscroll-behavior:contain}
+.resource-modal,.export-modal,.confirm-dialog{max-height:calc(100dvh - 44px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.resource-modal>header,.export-modal>header{position:sticky;top:0;z-index:2;background:#191a16}
+
+@media screen and (max-width:760px){
+  .resource-modal,.export-modal{max-height:calc(100dvh - 10px)}
+  .confirm-dialog{max-height:calc(100dvh - 10px)}
+}
+
 @media print{
   @page{size:A4 landscape;margin:8mm}
   :root,body,#root,.app-shell,.main{background:#fff!important;color:#000!important}

@@ -4,7 +4,23 @@ export type ConflictMap = Map<string,string[]>
 
 const timeMinutes=(value:string)=>{const [hours,minutes]=value.split(':').map(Number);return hours*60+minutes}
 const resourceIdentity=(booking:Booking,resource:'vehicle'|'driver'|'guide')=>booking[`${resource}Id`]||booking[resource]
-export function bookingTimeRange(booking:Booking){const start=timeMinutes(booking.time),explicit=booking.endTime?timeMinutes(booking.endTime):NaN;return {start,end:Number.isFinite(explicit)&&explicit>start?explicit:start+180}}
+export const FALLBACK_TOUR_DURATION_MINUTES=180
+
+export function formatDuration(minutes:number|null|undefined){
+  if(!minutes||minutes<=0)return 'Not set'
+  const hours=Math.floor(minutes/60),rest=minutes%60,hourLabel=hours===1?'hr':'hrs'
+  if(hours&&rest)return `${hours} ${hourLabel} ${rest} min`
+  if(hours)return `${hours} ${hourLabel}`
+  return `${rest} min`
+}
+
+export function bookingDurationMinutes(booking:Booking){
+  const start=timeMinutes(booking.time),explicit=booking.endTime?timeMinutes(booking.endTime):NaN
+  if(Number.isFinite(explicit)&&explicit>start)return explicit-start
+  return booking.tourDurationMinutes&&booking.tourDurationMinutes>0?booking.tourDurationMinutes:FALLBACK_TOUR_DURATION_MINUTES
+}
+
+export function bookingTimeRange(booking:Booking){const start=timeMinutes(booking.time);return {start,end:start+bookingDurationMinutes(booking)}}
 
 export function findBookingConflicts(items:Booking[]):ConflictMap{
   const conflicts:ConflictMap=new Map()

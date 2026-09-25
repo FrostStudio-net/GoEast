@@ -6,7 +6,7 @@ import { createBooking as createBookingRecord, deleteBooking as deleteBookingRec
 import { getResources } from './services/resources'
 import { getCustomers } from './services/customers'
 import type { Booking, BookingStatus, CustomerRow, ResourceOptions } from './types/database'
-import { findBookingConflicts } from './lib/schedule'
+import { bookingDurationMinutes, findBookingConflicts, formatDuration } from './lib/schedule'
 import { deriveDashboardData } from './lib/dashboard'
 import { isValidIsoDate, timeRangeError, validateBooking } from './lib/validation'
 import { getEgilsstadirWeather } from './services/weather'
@@ -14,6 +14,8 @@ import type { CurrentWeather } from './services/weather'
 import type { PrintSheetMode } from './PrintSheets'
 import { ConfirmationProvider } from './components/ConfirmDialog'
 import { useConfirmation } from './components/confirmationContext'
+import { scrollPageToTop, useBodyScrollLock } from './lib/useBodyScrollLock'
+import { clearFormDraft, formDraftKey, useDraftDiscard, useFormDraft } from './lib/useFormDraft'
 import './App.css'
 
 const CalendarPage=lazy(()=>import('./CalendarPage').then(module=>({default:module.CalendarPage})))
@@ -61,6 +63,12 @@ function App(){
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{void resolve(session?.user||null)})
     return()=>{active=false;subscription.unsubscribe()}
   },[])
+  useLayoutEffect(()=>{
+    if(authState==='admin')return
+    scrollPageToTop()
+    const frame=window.requestAnimationFrame(scrollPageToTop)
+    return()=>window.cancelAnimationFrame(frame)
+  },[authState])
   if(authState==='loading')return <AuthLoading/>
   if(authState==='unauthenticated')return <LoginScreen/>
   if(authState==='denied')return <AccessDenied email={user?.email||''}/>
@@ -70,7 +78,7 @@ function App(){
 
 function LoginScreen(){
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[submitting,setSubmitting]=useState(false)
-  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(submitting)return;const submittedControl=document.activeElement instanceof HTMLElement?document.activeElement:null;setError('');setSubmitting(true);try{const {error:authError}=await supabase.auth.signInWithPassword({email,password});if(authError)setError('Unable to sign in. Check your email and password.');else{submittedControl?.blur();if(document.activeElement instanceof HTMLElement)document.activeElement.blur()}}catch{setError('Unable to reach the authentication service. Check your connection and try again.')}finally{setSubmitting(false)}}
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(submitting)return;const submittedControl=document.activeElement instanceof HTMLElement?document.activeElement:null;setError('');setSubmitting(true);try{const {error:authError}=await supabase.auth.signInWithPassword({email,password});if(authError)setError('Unable to sign in. Check your email and password.');else{submittedControl?.blur();if(document.activeElement instanceof HTMLElement)document.activeElement.blur();scrollPageToTop();window.requestAnimationFrame(scrollPageToTop)}}catch{setError('Unable to reach the authentication service. Check your connection and try again.')}finally{setSubmitting(false)}}
   return <main className="auth-page"><section className="login-card"><img src="/goeast-logo.png" alt="GoEast"/><h1>Welcome back</h1><p>Sign in to manage bookings and daily operations.</p><form onSubmit={submit}><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="auth-error">{error}</div>}<button className="primary-button" disabled={submitting}>{submitting?'Signing in…':'Sign in'}</button></form><small>Authorized GoEast staff only</small></section></main>
 }
 function AuthLoading(){return <main className="auth-page"><div className="app-loader"><span/><strong>Loading GoEast operations…</strong></div></main>}
@@ -91,35 +99,32 @@ function WeatherWidget(){
 function OperationsApp({user}:{user:User}){
   const routerNavigate=useNavigate(),location=useLocation()
   const identity=userIdentity(user)
-  const routeKey=`${location.pathname}${location.search}`
-  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null),routeRef=useRef(routeKey)
+  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null)
   const [menuOpen,setMenuOpen]=useState(false),[bookingRecords,setBookingRecords]=useState<Booking[]>([]),[resources,setResources]=useState<ResourceOptions|null>(null),[customers,setCustomers]=useState<CustomerRow[]>([]),[loading,setLoading]=useState(true),[dataError,setDataError]=useState(''),[signOutError,setSignOutError]=useState(''),[signingOut,setSigningOut]=useState(false)
   const refreshData=async()=>{const [nextResources,nextCustomers]=await Promise.all([getResources(),getCustomers()]),nextBookings=await getBookings(nextResources,nextCustomers);setBookingRecords(nextBookings);setResources(nextResources);setCustomers(nextCustomers)}
   const load=async()=>{setLoading(true);setDataError('');try{await refreshData()}catch(error){setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')}finally{setLoading(false)}}
   // Initial remote data necessarily resolves into local UI state after mount.
   // oxlint-disable-next-line react/set-state-in-effect
   useEffect(()=>{void refreshData().catch(error=>setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')).finally(()=>setLoading(false))},[])
-  useLayoutEffect(()=>{routeRef.current=routeKey},[routeKey])
+  useBodyScrollLock(menuOpen)
   useLayoutEffect(()=>{
     const main=mainRef.current
     const mainOverflow=main?window.getComputedStyle(main).overflowY:''
     const scrollContainer=main&&/^(auto|scroll|overlay)$/.test(mainOverflow)?main:document.scrollingElement
     if(scrollContainer)scrollContainer.scrollTop=0
-    else window.scrollTo(0,0)
+    else scrollPageToTop()
+    const frame=window.requestAnimationFrame(()=>{
+      if(scrollContainer)scrollContainer.scrollTop=0
+      else scrollPageToTop()
+    })
+    return()=>window.cancelAnimationFrame(frame)
   },[location.pathname,location.search])
   useEffect(()=>{
     if(!menuOpen)return
-    const lockedRoute=routeRef.current,scrollY=window.scrollY,body=document.body,root=document.documentElement
-    const previousBody={overflow:body.style.overflow,position:body.style.position,top:body.style.top,left:body.style.left,right:body.style.right,width:body.style.width}
-    const previousRootOverflow=root.style.overflow
     const menuButton=menuButtonRef.current
-    root.style.overflow='hidden'
-    body.style.overflow='hidden'
-    body.style.position='fixed'
-    body.style.top=`-${scrollY}px`
-    body.style.left='0'
-    body.style.right='0'
-    body.style.width='100%'
+    const main=mainRef.current
+    main?.setAttribute('inert','')
+    main?.setAttribute('aria-hidden','true')
     const frame=window.requestAnimationFrame(()=>sidebarRef.current?.querySelector<HTMLElement>('.mobile-close')?.focus())
     const handleKey=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){event.preventDefault();setMenuOpen(false);return}
@@ -131,13 +136,13 @@ function OperationsApp({user}:{user:User}){
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
     }
     document.addEventListener('keydown',handleKey)
-    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);root.style.overflow=previousRootOverflow;Object.assign(body.style,previousBody);window.scrollTo(0,routeRef.current===lockedRoute?scrollY:0);menuButton?.focus({preventScroll:true})}
+    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);main?.removeAttribute('inert');main?.removeAttribute('aria-hidden');menuButton?.focus({preventScroll:true})}
   },[menuOpen])
   const page=location.pathname.startsWith('/schedule')||location.pathname.startsWith('/daily-schedule')?'Daily schedule':location.pathname.startsWith('/calendar')?'Calendar':location.pathname.startsWith('/bookings/new')?'New booking':location.pathname.startsWith('/bookings')?'Bookings':location.pathname.startsWith('/tours')?'Tours':location.pathname.startsWith('/ships')?'Ships':location.pathname.startsWith('/vehicles')?'Vehicles':location.pathname.startsWith('/staff')?'Staff':location.pathname.startsWith('/customers')?'Customers':'Dashboard'
   const navigate=(label:string)=>{const paths:Record<string,string>={Dashboard:'/',Bookings:'/bookings','Daily schedule':'/schedule',Calendar:'/calendar',Tours:'/tours',Ships:'/ships',Vehicles:'/vehicles',Staff:'/staff',Customers:'/customers'};if(paths[label])routerNavigate(paths[label]);setMenuOpen(false)}
   const createBooking=async(booking:Booking)=>{await createBookingRecord(booking);await refreshData();routerNavigate('/bookings')}
   const updateBooking=async(booking:Booking)=>{await updateBookingRecord(booking);await refreshData()}
-  const deleteBooking=async(booking:Booking)=>{await deleteBookingRecord(booking.uuid);await refreshData();routerNavigate('/bookings',{state:{success:`Booking ${booking.id} deleted permanently.`}})}
+  const deleteBooking=async(booking:Booking)=>{await deleteBookingRecord(booking.uuid);clearFormDraft(formDraftKey('booking',booking.uuid));await refreshData();routerNavigate('/bookings',{state:{success:`Booking ${booking.id} deleted permanently.`}})}
   const signOut=async()=>{if(signingOut)return;setSigningOut(true);setSignOutError('');try{const {error}=await supabase.auth.signOut();if(error)setSignOutError('Unable to sign out. Please try again.')}catch{setSignOutError('Unable to sign out. Check your connection and try again.')}finally{setSigningOut(false)}}
   return <ConfirmationProvider><div className="app-shell">
     {menuOpen&&<button className="scrim" aria-label="Close navigation" onClick={()=>setMenuOpen(false)}/>}<aside id="app-navigation" ref={sidebarRef} className={`sidebar ${menuOpen?'sidebar-open':''}`}>
@@ -196,7 +201,7 @@ function DailySchedulePage({data,onOpenBooking}:{data:Booking[];onOpenBooking:(b
 
 function ScheduleStat({label,value,icon,tone,alert=false}:{label:string;value:number;icon:IconName;tone:string;alert?:boolean}){return <article className={`schedule-stat ${alert?'has-alert':''}`}><span className={`schedule-stat-icon tone-${tone}`}><Icon name={icon} size={17}/></span><div><span>{label}</span><strong>{value}</strong></div></article>}
 function Assignment({label,value}:{label:string;value:string}){const missing=!value||value==='Unassigned';return <span className={`assignment ${missing?'missing':''}`}><small>{label}</small><strong>{missing?`No ${label.toLowerCase()} assigned`:value}</strong></span>}
-function ScheduleRow({booking,conflicts,first,last,onClick}:{booking:Booking;conflicts:string[];first:boolean;last:boolean;onClick:()=>void}){return <article className={`schedule-row ${booking.status==='Cancelled'?'is-cancelled':''}`} onClick={onClick} tabIndex={0} onKeyDown={e=>{if(e.currentTarget===e.target&&(e.key==='Enter'||e.key===' '))onClick()}}><div className="schedule-time"><span className={`schedule-node ${first?'first':''} ${last?'last':''}`}/><strong>{booking.time}</strong><small>{booking.endTime||'≈ 3 hrs'}</small></div><div className="schedule-tour"><strong>{booking.tour}</strong><small>{booking.ship} · {booking.cruiseLine}</small>{conflicts.length>0&&<div className="conflict-badges">{conflicts.map(message=><span key={message}>! {message}</span>)}</div>}</div><div className="schedule-booking"><strong>{booking.id}</strong><small>{booking.customer}</small></div><div className="schedule-guests"><Icon name="people" size={15}/><strong>{booking.guests}</strong></div><div className="schedule-assignments"><Assignment label="Vehicle" value={booking.vehicle}/><Assignment label="Driver" value={booking.driver}/><Assignment label="Guide" value={booking.guide}/></div><div className="schedule-pickup"><strong>{booking.pickupLocation||booking.port||'Pickup not set'}</strong><small>{booking.ship}</small></div><div className="schedule-row-status"><Status status={booking.status}/><button className="row-arrow" aria-label={`Open booking ${booking.id}`}><Icon name="arrow" size={16}/></button></div></article>}
+function ScheduleRow({booking,conflicts,first,last,onClick}:{booking:Booking;conflicts:string[];first:boolean;last:boolean;onClick:()=>void}){return <article className={`schedule-row ${booking.status==='Cancelled'?'is-cancelled':''}`} onClick={onClick} tabIndex={0} onKeyDown={e=>{if(e.currentTarget===e.target&&(e.key==='Enter'||e.key===' '))onClick()}}><div className="schedule-time"><span className={`schedule-node ${first?'first':''} ${last?'last':''}`}/><strong>{booking.time}</strong><small>{booking.endTime||`≈ ${formatDuration(bookingDurationMinutes(booking))}`}</small></div><div className="schedule-tour"><strong>{booking.tour}</strong><small>{booking.ship} · {booking.cruiseLine}</small>{conflicts.length>0&&<div className="conflict-badges">{conflicts.map(message=><span key={message}>! {message}</span>)}</div>}</div><div className="schedule-booking"><strong>{booking.id}</strong><small>{booking.customer}</small></div><div className="schedule-guests"><Icon name="people" size={15}/><strong>{booking.guests}</strong></div><div className="schedule-assignments"><Assignment label="Vehicle" value={booking.vehicle}/><Assignment label="Driver" value={booking.driver}/><Assignment label="Guide" value={booking.guide}/></div><div className="schedule-pickup"><strong>{booking.pickupLocation||booking.port||'Pickup not set'}</strong><small>{booking.ship}</small></div><div className="schedule-row-status"><Status status={booking.status}/><button className="row-arrow" aria-label={`Open booking ${booking.id}`}><Icon name="arrow" size={16}/></button></div></article>}
 
 function Stat({icon,label,value,detail,tone}:{icon:IconName;label:string;value:string;detail:string;tone:string}){return <article className="stat-card"><div className={`stat-icon tone-${tone}`}><Icon name={icon} size={19}/></div><p className="eyebrow">{label}</p><strong className="stat-value">{value}</strong><p className="stat-detail">{detail}</p></article>}
 function Fleet({name,meta,status,tone}:{name:string;meta:string;status:string;tone:string}){return <div className="fleet-row"><span className={`vehicle-icon tone-${tone}`}><Icon name="vehicle" size={18}/></span><div><strong>{name}</strong><small>{meta}</small></div><span className={`fleet-status ${tone}`}>{status}</span></div>}
@@ -243,9 +248,11 @@ type NewBookingForm = {
 function NewBookingPage({onSave,onCancel,existingCount,resources}:{onSave:(booking:Booking)=>Promise<void>;onCancel:()=>void;existingCount:number;resources:ResourceOptions}){
   const firstShip=resources.ships[0],firstLine=resources.cruiseLines.find(line=>line.id===firstShip?.cruise_line_id)
   const today=new Date().toISOString().slice(0,10),bookingPrefix=today.slice(2).replaceAll('-','')
-  const [form,setForm]=useState<NewBookingForm>({
+  const initialForm:NewBookingForm={
     id:`GE-${bookingPrefix}-${String(existingCount+1).padStart(2,'0')}`,status:'Confirmed',bookingDate:today,customerName:'',contactPerson:'',email:'',phone:'',ship:firstShip?.id||'',cruiseLine:firstLine?.name||'',port:'',tour:'',tourDate:today,startTime:'',endTime:'',guests:'1',vehicle:'',driver:'',guide:'',pickupLocation:'',meetingInstructions:'',price:'0',currency:'ISK',paymentStatus:'unpaid',notes:''
-  })
+  }
+  const {value:form,setValue:setForm,dirty,clearDraft}=useFormDraft(formDraftKey('booking'),initialForm,'new-booking-v1')
+  const discardDraft=useDraftDiscard(dirty,clearDraft,onCancel,'booking')
   const [errors,setErrors]=useState<Record<string,string>>({}),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState('')
   const set=(key:keyof NewBookingForm)=>(value:string)=>{setForm(current=>({...current,[key]:value}));setErrors(current=>({...current,[key]:''}))}
   const validate=()=>{
@@ -271,10 +278,10 @@ function NewBookingPage({onSave,onCancel,existingCount,resources}:{onSave:(booki
     const date=scheduleDate(form.tourDate)
     const amount=Number(form.price).toLocaleString('en-US',{maximumFractionDigits:0})
     const ship=resources.ships.find(item=>item.id===form.ship),tour=resources.tours.find(item=>item.id===form.tour),vehicle=resources.vehicles.find(item=>item.id===form.vehicle),driver=resources.staff.find(item=>item.id===form.driver),guide=resources.staff.find(item=>item.id===form.guide)
-    try{await onSave({uuid:'',id:form.id,customer:displayName,customerId:null,contactPerson:form.contactPerson,initials,email:form.email,phone:form.phone,country:'—',bookingDate:form.bookingDate,date,serviceDate:form.tourDate,time:form.startTime,endTime:form.endTime,ship:ship?.name||'Unassigned',shipId:ship?.id||null,cruiseLine:form.cruiseLine,port:form.port,tour:tour?.name||'',tourId:tour?.id||'',guests:Number(form.guests),vehicle:vehicle?.name||'Unassigned',vehicleId:vehicle?.id||null,driver:driver?.name||'Unassigned',driverId:driver?.id||null,guide:guide?.name||'Unassigned',guideId:guide?.id||null,pickupLocation:form.pickupLocation,meetingInstructions:form.meetingInstructions,price:`${form.currency} ${amount}`,priceValue:Number(form.price),currency:form.currency,paymentStatus:form.paymentStatus,status:asInquiry?'Inquiry':form.status,source:'Supabase',notes:form.notes,accent:'#b59662'})}catch(error){setSaveError(error instanceof Error?error.message:'Unable to save booking.')}finally{setSaving(false)}
+    try{await onSave({uuid:'',id:form.id,customer:displayName,customerId:null,contactPerson:form.contactPerson,initials,email:form.email,phone:form.phone,country:'—',bookingDate:form.bookingDate,date,serviceDate:form.tourDate,time:form.startTime,endTime:form.endTime,ship:ship?.name||'Unassigned',shipId:ship?.id||null,cruiseLine:form.cruiseLine,port:form.port,tour:tour?.name||'',tourId:tour?.id||'',tourDurationMinutes:tour?.default_duration_minutes??null,guests:Number(form.guests),vehicle:vehicle?.name||'Unassigned',vehicleId:vehicle?.id||null,driver:driver?.name||'Unassigned',driverId:driver?.id||null,guide:guide?.name||'Unassigned',guideId:guide?.id||null,pickupLocation:form.pickupLocation,meetingInstructions:form.meetingInstructions,price:`${form.currency} ${amount}`,priceValue:Number(form.price),currency:form.currency,paymentStatus:form.paymentStatus,status:asInquiry?'Inquiry':form.status,source:'Supabase',notes:form.notes,accent:'#b59662'});clearDraft()}catch(error){setSaveError(error instanceof Error?error.message:'Unable to save booking.')}finally{setSaving(false)}
   }
   return <div className="page new-booking-page">
-    <div className="form-page-heading"><button className="back-button" onClick={onCancel}><span>‹</span> Back to bookings</button><div className="page-heading"><div><p className="eyebrow">BOOKINGS</p><h1>New booking</h1><p>Create a reservation and assign the operational details.</p></div></div></div>
+    <div className="form-page-heading"><button className="back-button" onClick={discardDraft}><span>‹</span> Back to bookings</button><div className="page-heading"><div><p className="eyebrow">BOOKINGS</p><h1>New booking</h1><p>Create a reservation and assign the operational details.</p></div></div></div>
     {Object.values(errors).some(Boolean)&&<div className="validation-banner"><strong>Some required information is missing.</strong><span>Review the highlighted fields before saving.</span></div>}
     <form className="booking-form" onSubmit={e=>{e.preventDefault();void submit()}} noValidate>
       <FormSection title="Booking information" description="Reference and current booking state."><FormGrid><FormField label="Booking number" required error={errors.id}><input className={errors.id?'invalid':''} value={form.id} onChange={e=>set('id')(e.target.value)}/></FormField><FormField label="Booking status"><select value={form.status} onChange={e=>set('status')(e.target.value)}><option>Inquiry</option><option>Confirmed</option><option>Completed</option><option>Cancelled</option></select></FormField><FormField label="Booking date" required error={errors.bookingDate}><input className={errors.bookingDate?'invalid':''} type="date" value={form.bookingDate} onChange={e=>set('bookingDate')(e.target.value)}/></FormField></FormGrid></FormSection>
@@ -284,7 +291,7 @@ function NewBookingPage({onSave,onCancel,existingCount,resources}:{onSave:(booki
       <FormSection title="Operations" description="Resource assignments and meeting details."><FormGrid><FormField label="Vehicle"><select value={form.vehicle} onChange={e=>set('vehicle')(e.target.value)}><option value="">Unassigned</option>{resources.vehicles.filter(option=>option.active).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></FormField><FormField label="Driver"><select value={form.driver} onChange={e=>set('driver')(e.target.value)}><option value="">Unassigned</option>{resources.staff.filter(person=>person.active&&person.can_drive).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></FormField><FormField label="Guide"><select value={form.guide} onChange={e=>set('guide')(e.target.value)}><option value="">Unassigned</option>{resources.staff.filter(person=>person.active&&person.can_guide).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></FormField><FormField label="Pickup location"><input value={form.pickupLocation} onChange={e=>set('pickupLocation')(e.target.value)}/></FormField><FormField label="Meeting instructions" hint="Optional" wide><textarea value={form.meetingInstructions} onChange={e=>set('meetingInstructions')(e.target.value)} placeholder="Signage, berth, or guest-specific instructions"/></FormField></FormGrid></FormSection>
       <FormSection title="Financial" description="Price and invoicing state."><FormGrid><FormField label="Price" error={errors.price}><input className={errors.price?'invalid':''} type="number" min="0" value={form.price} onChange={e=>set('price')(e.target.value)}/></FormField><FormField label="Currency"><select value={form.currency} onChange={e=>set('currency')(e.target.value)}><option>ISK</option><option>EUR</option><option>USD</option></select></FormField><FormField label="Payment / invoice status"><select value={form.paymentStatus} onChange={e=>set('paymentStatus')(e.target.value)}><option value="unpaid">Unpaid</option><option value="invoiced">Invoiced</option><option value="paid">Paid</option><option value="not_applicable">Not applicable</option></select></FormField></FormGrid></FormSection>
       <FormSection title="Additional information" description="Visible to the internal operations team only."><FormGrid><FormField label="Internal notes" wide><textarea value={form.notes} onChange={e=>set('notes')(e.target.value)} placeholder="Accessibility, dietary, timing, or supplier notes"/></FormField></FormGrid></FormSection>
-      {saveError&&<div className="form-save-error">{saveError}</div>}<div className="form-actions"><button type="button" className="secondary-button" onClick={onCancel} disabled={saving}>Cancel</button><div><button type="button" className="inquiry-button" onClick={()=>void submit(true)} disabled={saving}>Save as inquiry</button><button type="submit" className="primary-button" disabled={saving}>{saving?'Saving…':'Save booking'}</button></div></div>
+      {saveError&&<div className="form-save-error">{saveError}</div>}<div className="form-actions"><button type="button" className="secondary-button" onClick={discardDraft} disabled={saving}>Cancel</button><div><button type="button" className="inquiry-button" onClick={()=>void submit(true)} disabled={saving}>Save as inquiry</button><button type="submit" className="primary-button" disabled={saving}>{saving?'Saving…':'Save booking'}</button></div></div>
     </form>
   </div>
 }
@@ -298,22 +305,25 @@ function Filter({label,value,onChange,options,all}:{label:string;value:string;on
 function BookingDetailPage({data,resources,onUpdate,onDelete}:{data:Booking[];resources:ResourceOptions;onUpdate:(booking:Booking)=>Promise<void>;onDelete:(booking:Booking)=>Promise<void>}){
   const {bookingId}=useParams(),navigate=useNavigate(),booking=data.find(item=>item.id===bookingId||item.uuid===bookingId)
   const confirm=useConfirmation()
-  const [editing,setEditing]=useState(false),[draft,setDraft]=useState<Booking|null>(null),[saving,setSaving]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('')
+  const bookingDraftKey=formDraftKey('booking',booking?.uuid||bookingId||'missing')
+  const {value:draft,setValue:setDraft,dirty,restored,clearDraft}=useFormDraft<Booking|null>(bookingDraftKey,booking?{...booking}:null,booking?.updatedAt||'missing-booking')
+  const [editing,setEditing]=useState(restored),[saving,setSaving]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('')
+  const discardEdit=useDraftDiscard(dirty,clearDraft,()=>{setDraft(booking?{...booking}:null);setEditing(false);setError('')},'booking')
   if(!booking)return <div className="page record-not-found"><p className="eyebrow">BOOKINGS</p><h1>Booking not found</h1><p>This booking may have been removed or the address is incorrect.</p><button className="secondary-button" onClick={()=>navigate('/bookings')}>Back to bookings</button></div>
   const record=editing&&draft?draft:booking
   const change=(updates:Partial<Booking>)=>setDraft(current=>({...record,...current,...updates}))
-  const beginEdit=()=>{setDraft({...booking});setEditing(true);setError('');setSuccess('')}
-  const save=async()=>{if(!draft||saving)return;const validationErrors=validateBooking(draft);if(validationErrors.length){setError(validationErrors.join(' '));return}setSaving(true);setError('');setSuccess('');try{await onUpdate(draft);setEditing(false);setDraft(null);setSuccess('Booking changes saved successfully.');navigate(`/bookings/${encodeURIComponent(draft.id)}`,{replace:true})}catch(nextError){setError(nextError instanceof Error?nextError.message:'Unable to save booking.')}finally{setSaving(false)}}
-  const cancelBooking=async()=>{if(booking.status==='Cancelled'||saving)return;setSaving(true);setError('');setSuccess('');try{await onUpdate({...booking,status:'Cancelled'});setEditing(false);setDraft(null);setSuccess('Booking cancelled successfully.')}catch(nextError){throw new Error(nextError instanceof Error?nextError.message:'Unable to cancel booking.')}finally{setSaving(false)}}
+  const beginEdit=()=>{setEditing(true);setError('');setSuccess('')}
+  const save=async()=>{if(!draft||saving)return;const validationErrors=validateBooking(draft);if(validationErrors.length){setError(validationErrors.join(' '));return}setSaving(true);setError('');setSuccess('');try{await onUpdate(draft);clearDraft();setEditing(false);setSuccess('Booking changes saved successfully.');navigate(`/bookings/${encodeURIComponent(draft.id)}`,{replace:true})}catch(nextError){setError(nextError instanceof Error?nextError.message:'Unable to save booking.')}finally{setSaving(false)}}
+  const cancelBooking=async()=>{if(booking.status==='Cancelled'||saving)return;setSaving(true);setError('');setSuccess('');try{await onUpdate({...booking,status:'Cancelled'});clearDraft();setEditing(false);setSuccess('Booking cancelled successfully.')}catch(nextError){throw new Error(nextError instanceof Error?nextError.message:'Unable to cancel booking.')}finally{setSaving(false)}}
   const requestCancel=()=>confirm({title:'Cancel booking?',message:`Booking ${booking.id} will remain in the system but will be removed from active operations.`,cancelLabel:'Keep booking',confirmLabel:'Cancel booking',destructive:true,onConfirm:cancelBooking})
   const requestDelete=()=>confirm({title:'Delete booking permanently?',message:`This action permanently removes booking ${booking.id} and cannot be undone.`,cancelLabel:'Keep booking',confirmLabel:'Delete permanently',destructive:true,onConfirm:async()=>{try{await onDelete(booking)}catch(nextError){throw new Error(nextError instanceof Error?nextError.message:'Unable to delete booking.')}}})
   const selectShip=(id:string)=>{const ship=resources.ships.find(item=>item.id===id),line=resources.cruiseLines.find(item=>item.id===ship?.cruise_line_id);change({ship:ship?.name||'Unassigned',shipId:ship?.id||null,cruiseLine:line?.name||''})}
-  const selectTour=(id:string)=>{const tour=resources.tours.find(item=>item.id===id);if(tour)change({tour:tour.name,tourId:tour.id})}
+  const selectTour=(id:string)=>{const tour=resources.tours.find(item=>item.id===id);if(tour)change({tour:tour.name,tourId:tour.id,tourDurationMinutes:tour.default_duration_minutes})}
   const selectVehicle=(id:string)=>{const resource=resources.vehicles.find(item=>item.id===id);change({vehicle:resource?.name||'Unassigned',vehicleId:resource?.id||null})}
   const selectStaff=(role:'driver'|'guide',id:string)=>{const person=resources.staff.find(item=>item.id===id);change(role==='driver'?{driver:person?.name||'Unassigned',driverId:person?.id||null}:{guide:person?.name||'Unassigned',guideId:person?.id||null})}
   return <div className="page booking-record-page">
     <button className="back-button record-back" onClick={()=>navigate('/bookings')}><span>‹</span> Back to bookings</button>
-    <header className="record-header"><div><div className="record-title-line"><h1>{record.id}</h1><Status status={record.status}/></div><p>{record.date} · {record.time}{record.endTime?`–${record.endTime}`:''}</p></div><div className="record-header-actions">{editing?<><button className="secondary-button" onClick={()=>{setDraft(null);setEditing(false);setError('')}} disabled={saving}>Discard changes</button><button className="primary-button" onClick={()=>void save()} disabled={saving}>{saving?'Saving…':'Save changes'}</button></>:<button className="primary-button" onClick={beginEdit}>Edit booking</button>}</div></header>
+    <header className="record-header"><div><div className="record-title-line"><h1>{record.id}</h1><Status status={record.status}/></div><p>{record.date} · {record.time}{record.endTime?`–${record.endTime}`:''}</p></div><div className="record-header-actions">{editing?<><button className="secondary-button" onClick={discardEdit} disabled={saving}>Discard changes</button><button className="primary-button" onClick={()=>void save()} disabled={saving}>{saving?'Saving…':'Save changes'}</button></>:<button className="primary-button" onClick={beginEdit}>Edit booking</button>}</div></header>
     {success&&<div className="record-feedback success"><Icon name="check" size={16}/>{success}</div>}{error&&<div className="record-feedback error">! {error}</div>}
     <div className="record-grid">
       <RecordCard title="Booking information"><RecordFields><RecordField label="Booking number" value={record.id} editing={editing}><input value={record.id} onChange={e=>change({id:e.target.value})}/></RecordField><RecordField label="Status" value={record.status} editing={editing}><select value={record.status} onChange={e=>change({status:e.target.value as BookingStatus})}><option>Inquiry</option><option>Confirmed</option><option>Completed</option><option>Cancelled</option></select></RecordField><RecordField label="Booking date" value={record.bookingDate||'—'} editing={editing}><input type="date" value={record.bookingDate||''} onChange={e=>change({bookingDate:e.target.value})}/></RecordField><RecordField label="Service date" value={record.date} editing={editing}><input type="date" value={record.serviceDate} onChange={e=>change({serviceDate:e.target.value,date:scheduleDate(e.target.value)})}/></RecordField><RecordField label="Start time" value={record.time} editing={editing}><input type="time" value={record.time} onChange={e=>change({time:e.target.value})}/></RecordField><RecordField label="End time" value={record.endTime||'—'} editing={editing}><input type="time" value={record.endTime||''} onChange={e=>change({endTime:e.target.value})}/></RecordField></RecordFields></RecordCard>
