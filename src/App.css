@@ -72,7 +72,7 @@
 
 /* Mobile density and control polish. Kept late in the cascade to normalize older responsive rules. */
 @media screen and (max-width:760px){
-  html,body,#root,.app-shell,.main{max-width:100%;overflow-x:clip}.page{min-width:0;padding:20px 15px max(34px,calc(env(safe-area-inset-bottom) + 20px))}.page>*{max-width:100%}
+  html,body,#root,.app-shell,.main{max-width:100%;overflow-x:clip}.page{min-width:0;padding:20px 15px max(34px,calc(env(safe-area-inset-bottom) + 20px))}.dashboard-page{padding-top:0}.page>*{max-width:100%}
   .page-heading,.resource-page-heading,.schedule-heading,.calendar-heading{margin-bottom:18px}.page-heading h1,.schedule-heading h1,.calendar-heading h1,.resource-page-heading h1{font-size:24px;letter-spacing:-.45px}.page-heading>div>p:last-child,.resource-page-heading>div>p:not(.eyebrow){line-height:1.45}
 
   .topbar{height:58px;padding:0 10px}.menu-button{width:40px;height:40px}.topbar-actions{gap:8px}.weather-widget{max-width:165px;gap:6px;padding-right:9px}.weather-widget>span:last-child{min-width:0}.weather-widget small{max-width:126px;text-overflow:ellipsis;white-space:nowrap}.weather-icon{width:22px;font-size:16px}.top-avatar{width:29px;height:29px}
