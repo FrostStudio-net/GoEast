@@ -4,7 +4,7 @@ export type ConflictMap = Map<string,string[]>
 
 const timeMinutes=(value:string)=>{const [hours,minutes]=value.split(':').map(Number);return hours*60+minutes}
 const resourceIdentity=(booking:Booking,resource:'vehicle'|'driver'|'guide')=>booking[`${resource}Id`]||booking[resource]
-const endMinutes=(booking:Booking,start:number)=>{const explicit=booking.endTime?timeMinutes(booking.endTime):NaN;return Number.isFinite(explicit)&&explicit>start?explicit:start+180}
+export function bookingTimeRange(booking:Booking){const start=timeMinutes(booking.time),explicit=booking.endTime?timeMinutes(booking.endTime):NaN;return {start,end:Number.isFinite(explicit)&&explicit>start?explicit:start+180}}
 
 export function findBookingConflicts(items:Booking[]):ConflictMap{
   const conflicts:ConflictMap=new Map()
@@ -12,7 +12,7 @@ export function findBookingConflicts(items:Booking[]):ConflictMap{
   for(let left=0;left<active.length;left++)for(let right=left+1;right<active.length;right++){
     const a=active[left],b=active[right]
     if(a.uuid===b.uuid||a.id===b.id)continue
-    const aStart=timeMinutes(a.time),bStart=timeMinutes(b.time),aEnd=endMinutes(a,aStart),bEnd=endMinutes(b,bStart)
+    const {start:aStart,end:aEnd}=bookingTimeRange(a),{start:bStart,end:bEnd}=bookingTimeRange(b)
     if(aStart>=bEnd||bStart>=aEnd)continue
     ;(['vehicle','driver','guide'] as const).forEach(resource=>{
       const aIdentity=resourceIdentity(a,resource),bIdentity=resourceIdentity(b,resource)

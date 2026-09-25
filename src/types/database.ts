@@ -8,7 +8,7 @@ export type Booking = {
   guests:number; vehicle:string; vehicleId:string|null; driver:string; driverId:string|null; guide:string; guideId:string|null;
   price:string; priceValue:number; status:BookingStatus; source:string; notes:string; accent:string; bookingDate?:string;
   contactPerson?:string; port?:string; endTime?:string; pickupLocation?:string; meetingInstructions?:string;
-  currency?:string; paymentStatus?:string
+  currency?:string; paymentStatus?:string; createdAt?:string
 }
 
 export type CustomerRow = { id:string; name:string; contact_person:string|null; email:string|null; phone:string|null; created_at:string; updated_at:string }
