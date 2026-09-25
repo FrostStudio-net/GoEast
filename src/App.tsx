@@ -90,13 +90,15 @@ function WeatherWidget(){
 function OperationsApp({user}:{user:User}){
   const routerNavigate=useNavigate(),location=useLocation()
   const identity=userIdentity(user)
-  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null)
+  const routeKey=`${location.pathname}${location.search}`
+  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null),routeRef=useRef(routeKey)
   const [menuOpen,setMenuOpen]=useState(false),[bookingRecords,setBookingRecords]=useState<Booking[]>([]),[resources,setResources]=useState<ResourceOptions|null>(null),[customers,setCustomers]=useState<CustomerRow[]>([]),[loading,setLoading]=useState(true),[dataError,setDataError]=useState(''),[signOutError,setSignOutError]=useState(''),[signingOut,setSigningOut]=useState(false)
   const refreshData=async()=>{const [nextResources,nextCustomers]=await Promise.all([getResources(),getCustomers()]),nextBookings=await getBookings(nextResources,nextCustomers);setBookingRecords(nextBookings);setResources(nextResources);setCustomers(nextCustomers)}
   const load=async()=>{setLoading(true);setDataError('');try{await refreshData()}catch(error){setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')}finally{setLoading(false)}}
   // Initial remote data necessarily resolves into local UI state after mount.
   // oxlint-disable-next-line react/set-state-in-effect
   useEffect(()=>{void refreshData().catch(error=>setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')).finally(()=>setLoading(false))},[])
+  useLayoutEffect(()=>{routeRef.current=routeKey},[routeKey])
   useLayoutEffect(()=>{
     const main=mainRef.current
     const mainOverflow=main?window.getComputedStyle(main).overflowY:''
@@ -106,9 +108,17 @@ function OperationsApp({user}:{user:User}){
   },[location.pathname,location.search])
   useEffect(()=>{
     if(!menuOpen)return
-    const previousOverflow=document.body.style.overflow
+    const lockedRoute=routeRef.current,scrollY=window.scrollY,body=document.body,root=document.documentElement
+    const previousBody={overflow:body.style.overflow,position:body.style.position,top:body.style.top,left:body.style.left,right:body.style.right,width:body.style.width}
+    const previousRootOverflow=root.style.overflow
     const menuButton=menuButtonRef.current
-    document.body.style.overflow='hidden'
+    root.style.overflow='hidden'
+    body.style.overflow='hidden'
+    body.style.position='fixed'
+    body.style.top=`-${scrollY}px`
+    body.style.left='0'
+    body.style.right='0'
+    body.style.width='100%'
     const frame=window.requestAnimationFrame(()=>sidebarRef.current?.querySelector<HTMLElement>('.mobile-close')?.focus())
     const handleKey=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){event.preventDefault();setMenuOpen(false);return}
@@ -120,7 +130,7 @@ function OperationsApp({user}:{user:User}){
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
     }
     document.addEventListener('keydown',handleKey)
-    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);document.body.style.overflow=previousOverflow;menuButton?.focus()}
+    return()=>{window.cancelAnimationFrame(frame);document.removeEventListener('keydown',handleKey);root.style.overflow=previousRootOverflow;Object.assign(body.style,previousBody);window.scrollTo(0,routeRef.current===lockedRoute?scrollY:0);menuButton?.focus({preventScroll:true})}
   },[menuOpen])
   const page=location.pathname.startsWith('/schedule')||location.pathname.startsWith('/daily-schedule')?'Daily schedule':location.pathname.startsWith('/calendar')?'Calendar':location.pathname.startsWith('/bookings/new')?'New booking':location.pathname.startsWith('/bookings')?'Bookings':location.pathname.startsWith('/tours')?'Tours':location.pathname.startsWith('/ships')?'Ships':location.pathname.startsWith('/vehicles')?'Vehicles':location.pathname.startsWith('/staff')?'Staff':location.pathname.startsWith('/customers')?'Customers':'Dashboard'
   const navigate=(label:string)=>{const paths:Record<string,string>={Dashboard:'/',Bookings:'/bookings','Daily schedule':'/schedule',Calendar:'/calendar',Tours:'/tours',Ships:'/ships',Vehicles:'/vehicles',Staff:'/staff',Customers:'/customers'};if(paths[label])routerNavigate(paths[label]);setMenuOpen(false)}
