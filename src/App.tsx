@@ -14,7 +14,7 @@ import type { CurrentWeather } from './services/weather'
 import type { PrintSheetMode } from './PrintSheets'
 import { ConfirmationProvider } from './components/ConfirmDialog'
 import { useConfirmation } from './components/confirmationContext'
-import { scrollPageToTop, useBodyScrollLock } from './lib/useBodyScrollLock'
+import { scheduleScrollPageToTop, scrollPageToTop, useBodyScrollLock } from './lib/useBodyScrollLock'
 import { clearFormDraft, formDraftKey, useDraftDiscard, useFormDraft } from './lib/useFormDraft'
 import './App.css'
 
@@ -66,7 +66,7 @@ function App(){
   useLayoutEffect(()=>{
     if(authState==='admin')return
     scrollPageToTop()
-    const frame=window.requestAnimationFrame(scrollPageToTop)
+    const frame=window.requestAnimationFrame(()=>scrollPageToTop())
     return()=>window.cancelAnimationFrame(frame)
   },[authState])
   if(authState==='loading')return <AuthLoading/>
@@ -78,7 +78,7 @@ function App(){
 
 function LoginScreen(){
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[submitting,setSubmitting]=useState(false)
-  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(submitting)return;const submittedControl=document.activeElement instanceof HTMLElement?document.activeElement:null;setError('');setSubmitting(true);try{const {error:authError}=await supabase.auth.signInWithPassword({email,password});if(authError)setError('Unable to sign in. Check your email and password.');else{submittedControl?.blur();if(document.activeElement instanceof HTMLElement)document.activeElement.blur();scrollPageToTop();window.requestAnimationFrame(scrollPageToTop)}}catch{setError('Unable to reach the authentication service. Check your connection and try again.')}finally{setSubmitting(false)}}
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(submitting)return;const submittedControl=document.activeElement instanceof HTMLElement?document.activeElement:null;setError('');setSubmitting(true);try{const {error:authError}=await supabase.auth.signInWithPassword({email,password});if(authError)setError('Unable to sign in. Check your email and password.');else{submittedControl?.blur();if(document.activeElement instanceof HTMLElement)document.activeElement.blur();scrollPageToTop();window.requestAnimationFrame(()=>scrollPageToTop())}}catch{setError('Unable to reach the authentication service. Check your connection and try again.')}finally{setSubmitting(false)}}
   return <main className="auth-page"><section className="login-card"><img src="/goeast-logo.png" alt="GoEast"/><h1>Welcome back</h1><p>Sign in to manage bookings and daily operations.</p><form onSubmit={submit}><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="auth-error">{error}</div>}<button className="primary-button" disabled={submitting}>{submitting?'Signing in…':'Sign in'}</button></form><small>Authorized GoEast staff only</small></section></main>
 }
 function AuthLoading(){return <main className="auth-page"><div className="app-loader"><span/><strong>Loading GoEast operations…</strong></div></main>}
@@ -111,14 +111,15 @@ function OperationsApp({user}:{user:User}){
     const main=mainRef.current
     const mainOverflow=main?window.getComputedStyle(main).overflowY:''
     const scrollContainer=main&&/^(auto|scroll|overlay)$/.test(mainOverflow)?main:document.scrollingElement
-    if(scrollContainer)scrollContainer.scrollTop=0
-    else scrollPageToTop()
-    const frame=window.requestAnimationFrame(()=>{
-      if(scrollContainer)scrollContainer.scrollTop=0
-      else scrollPageToTop()
-    })
-    return()=>window.cancelAnimationFrame(frame)
+    scrollPageToTop(main)
+    return scheduleScrollPageToTop(scrollContainer instanceof HTMLElement?scrollContainer:main)
   },[location.pathname,location.search])
+  useLayoutEffect(()=>{
+    if(loading||location.pathname!=='/'||!resources)return
+    if(document.activeElement instanceof HTMLElement)document.activeElement.blur()
+    scrollPageToTop(mainRef.current)
+    return scheduleScrollPageToTop(mainRef.current)
+  },[loading,location.pathname,resources])
   useEffect(()=>{
     if(!menuOpen)return
     const menuButton=menuButtonRef.current

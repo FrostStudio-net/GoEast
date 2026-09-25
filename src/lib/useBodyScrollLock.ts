@@ -58,8 +58,29 @@ export function useBodyScrollLock(locked:boolean){
   },[locked])
 }
 
-export function scrollPageToTop(){
-  const scrollingElement=document.scrollingElement
-  if(scrollingElement)scrollingElement.scrollTop=0
-  window.scrollTo(0,0)
+export function scrollPageToTop(container?:HTMLElement|null){
+  if(container)container.scrollTop=0
+  if(document.scrollingElement)document.scrollingElement.scrollTop=0
+  document.documentElement.scrollTop=0
+  document.body.scrollTop=0
+  window.scrollTo({left:0,top:0,behavior:'auto'})
+}
+
+export function scheduleScrollPageToTop(container?:HTMLElement|null){
+  let innerFrame=0,delayedFrame=0
+  const outerFrame=window.requestAnimationFrame(()=>{
+    innerFrame=window.requestAnimationFrame(()=>scrollPageToTop(container))
+  })
+  // iOS Safari can finish dismissing its keyboard after the next paint and
+  // restore the focused control's former visual position. Confirm the reset
+  // once that viewport update has settled.
+  const timer=window.setTimeout(()=>{
+    delayedFrame=window.requestAnimationFrame(()=>scrollPageToTop(container))
+  },120)
+  return()=>{
+    window.cancelAnimationFrame(outerFrame)
+    if(innerFrame)window.cancelAnimationFrame(innerFrame)
+    if(delayedFrame)window.cancelAnimationFrame(delayedFrame)
+    window.clearTimeout(timer)
+  }
 }
