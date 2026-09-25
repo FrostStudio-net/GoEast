@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './lib/supabase'
@@ -90,13 +90,20 @@ function WeatherWidget(){
 function OperationsApp({user}:{user:User}){
   const routerNavigate=useNavigate(),location=useLocation()
   const identity=userIdentity(user)
-  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null)
+  const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null)
   const [menuOpen,setMenuOpen]=useState(false),[bookingRecords,setBookingRecords]=useState<Booking[]>([]),[resources,setResources]=useState<ResourceOptions|null>(null),[customers,setCustomers]=useState<CustomerRow[]>([]),[loading,setLoading]=useState(true),[dataError,setDataError]=useState(''),[signOutError,setSignOutError]=useState(''),[signingOut,setSigningOut]=useState(false)
   const refreshData=async()=>{const [nextResources,nextCustomers]=await Promise.all([getResources(),getCustomers()]),nextBookings=await getBookings(nextResources,nextCustomers);setBookingRecords(nextBookings);setResources(nextResources);setCustomers(nextCustomers)}
   const load=async()=>{setLoading(true);setDataError('');try{await refreshData()}catch(error){setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')}finally{setLoading(false)}}
   // Initial remote data necessarily resolves into local UI state after mount.
   // oxlint-disable-next-line react/set-state-in-effect
   useEffect(()=>{void refreshData().catch(error=>setDataError(error instanceof Error?error.message:'Unable to load GoEast data.')).finally(()=>setLoading(false))},[])
+  useLayoutEffect(()=>{
+    const main=mainRef.current
+    const mainOverflow=main?window.getComputedStyle(main).overflowY:''
+    const scrollContainer=main&&/^(auto|scroll|overlay)$/.test(mainOverflow)?main:document.scrollingElement
+    if(scrollContainer)scrollContainer.scrollTop=0
+    else window.scrollTo(0,0)
+  },[location.pathname,location.search])
   useEffect(()=>{
     if(!menuOpen)return
     const previousOverflow=document.body.style.overflow
@@ -127,7 +134,7 @@ function OperationsApp({user}:{user:User}){
       <nav aria-label="Main navigation"><p className="nav-label">WORKSPACE</p>{nav.slice(0,4).map(i=><NavItem key={i.label} item={i} page={page} onClick={navigate}/>)}<p className="nav-label nav-label-spaced">RESOURCES</p>{nav.slice(4).map(i=><NavItem key={i.label} item={i} page={page} onClick={navigate}/>)}</nav>
       <div className="sidebar-footer">{signOutError&&<div className="sidebar-error" role="alert">{signOutError}</div>}<button className="sidebar-signout" onClick={()=>void signOut()} disabled={signingOut}>{signingOut?'Signing out…':'Sign out'}</button></div>
     </aside>
-    <main className="main"><header className="topbar"><button ref={menuButtonRef} className="menu-button" onClick={()=>setMenuOpen(true)} aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="app-navigation"><Icon name="menu" size={21}/></button><div className="global-search"><Icon name="search" size={17}/><input aria-label="Search everything" placeholder="Search bookings, customers..."/><kbd>⌘ K</kbd></div><div className="topbar-actions"><span className="live-indicator"><i/>Operations live</span><WeatherWidget/><div className="topbar-user" title={identity.email}><span className="top-avatar">{identity.initials}</span><span><strong>{identity.displayName}</strong><small>{identity.email}</small></span></div></div></header>
+    <main ref={mainRef} className="main"><header className="topbar"><button ref={menuButtonRef} className="menu-button" onClick={()=>setMenuOpen(true)} aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="app-navigation"><Icon name="menu" size={21}/></button><div className="global-search"><Icon name="search" size={17}/><input aria-label="Search everything" placeholder="Search bookings, customers..."/><kbd>⌘ K</kbd></div><div className="topbar-actions"><span className="live-indicator"><i/>Operations live</span><WeatherWidget/><div className="topbar-user" title={identity.email}><span className="top-avatar">{identity.initials}</span><span><strong>{identity.displayName}</strong><small>{identity.email}</small></span></div></div></header>
       {dataError?<DataError message={dataError} onRetry={()=>void load()}/>:loading?<PageLoading/>:resources?<Suspense fallback={<PageLoading/>}><Routes><Route path="/" element={<Dashboard data={bookingRecords} userName={identity.firstName} onViewBookings={()=>routerNavigate('/bookings')} onNewBooking={()=>routerNavigate('/bookings/new')} onOpenBooking={booking=>routerNavigate(`/bookings/${encodeURIComponent(booking.id)}`)}/>}/><Route path="/bookings" element={<BookingsPage data={bookingRecords} onNewBooking={()=>routerNavigate('/bookings/new')} onOpenBooking={booking=>routerNavigate(`/bookings/${encodeURIComponent(booking.id)}`)}/>}/><Route path="/bookings/new" element={<NewBookingPage onSave={createBooking} onCancel={()=>routerNavigate('/bookings')} existingCount={bookingRecords.length} resources={resources}/>}/><Route path="/bookings/:bookingId" element={<BookingDetailPage data={bookingRecords} resources={resources} onUpdate={updateBooking} onDelete={deleteBooking}/>}/><Route path="/schedule" element={<DailySchedulePage data={bookingRecords} onOpenBooking={booking=>routerNavigate(`/bookings/${encodeURIComponent(booking.id)}`)}/>}/><Route path="/daily-schedule" element={<DailySchedulePage data={bookingRecords} onOpenBooking={booking=>routerNavigate(`/bookings/${encodeURIComponent(booking.id)}`)}/>}/><Route path="/calendar" element={<CalendarPage data={bookingRecords}/>}/><Route path="/tours" element={<ToursPage items={resources.tours} onRefresh={refreshData}/>}/><Route path="/ships" element={<ShipsPage ships={resources.ships} resources={resources} onRefresh={refreshData}/>}/><Route path="/vehicles" element={<VehiclesPage items={resources.vehicles} onRefresh={refreshData}/>}/><Route path="/staff" element={<StaffPage items={resources.staff} onRefresh={refreshData}/>}/><Route path="/customers" element={<CustomersPage items={customers} onRefresh={refreshData}/>}/><Route path="/customers/:customerId" element={<CustomerDetailPage customers={customers} bookings={bookingRecords}/>}/><Route path="*" element={<NotFoundPage/>}/></Routes></Suspense>:<PageLoading/>}</main>
   </div></ConfirmationProvider>
 }
