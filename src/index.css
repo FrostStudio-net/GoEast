@@ -9,3 +9,11 @@ button, select { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid #d8a83f; outline-offset: 2px; }
 button:disabled { cursor: default; }
 #root { min-height: 100vh; }
+
+@media (max-width: 760px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
