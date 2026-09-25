@@ -71,6 +71,12 @@ All operational tables have Row Level Security enabled. Their policies call `pub
 
 Do not weaken RLS or expose the service-role key to the frontend.
 
+## Weather data
+
+The top bar reads current Egilsstaðir conditions from Open-Meteo's browser-safe forecast endpoint. No weather credential is stored in the application, failures are isolated from operational data loading, and successful responses are cached in the browser for 15 minutes.
+
+Open-Meteo's public endpoint is suitable for evaluation and non-commercial use. Confirm the appropriate Open-Meteo commercial licence before production business use. A paid API key must never be added as a `VITE_` variable; if one is required, call the customer endpoint through a server-side Vercel function or another protected proxy.
+
 ## Commands
 
 ```bash
