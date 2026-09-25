@@ -65,3 +65,8 @@ export async function updateBooking(booking:Booking):Promise<void>{
   const {error}=await supabase.from('bookings').update(bookingPayload(booking,ids,customerId)).eq('id',booking.uuid)
   if(error)throw new Error(`Unable to update booking: ${error.message}`)
 }
+
+export async function deleteBooking(id:string):Promise<void>{
+  const {error}=await supabase.from('bookings').delete().eq('id',id)
+  if(error)throw new Error(`Unable to delete booking: ${error.message}`)
+}
