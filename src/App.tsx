@@ -343,7 +343,7 @@ function BookingTable({data,compact=false,onSelect,emptyMessage='No bookings mat
     <div className="table-scroll">
       <table className={compact?'compact':'bookings-table'}>
         <thead><tr>
-          {compact?<><th>CUSTOMER</th><th>TOUR</th><th>DATE & TIME</th><th>GUESTS</th><th>STATUS</th></>:<><th>BOOKING</th><th>DATE / START</th><th>SHIP / CRUISE LINE</th><th>TOUR</th><th>CUSTOMER</th><th>GUESTS</th><th>VEHICLE</th><th>DRIVER</th><th>PRICE</th><th>STATUS</th></>}
+          {compact?<><th>CUSTOMER</th><th>TOUR</th><th>DATE & TIME</th><th>GUESTS</th><th>STATUS</th></>:<><th className="booking-secondary-column">BOOKING</th><th>DATE / START</th><th className="booking-secondary-column">SHIP / CRUISE LINE</th><th>TOUR</th><th>CUSTOMER</th><th>GUESTS</th><th>VEHICLE</th><th>DRIVER</th><th className="booking-secondary-column">PRICE</th><th>STATUS</th></>}
           <th className="booking-action-column"><span className="sr-only">Open</span></th>
         </tr></thead>
         <tbody>
@@ -355,15 +355,15 @@ function BookingTable({data,compact=false,onSelect,emptyMessage='No bookings mat
               <td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td>
               <td><Status status={b.status}/></td>
             </>:<>
-              <td><strong className="booking-id">{b.id}</strong><small>{b.source}</small></td>
+              <td className="booking-secondary-column"><strong className="booking-id">{b.id}</strong><small>{b.source}</small></td>
               <td><strong>{b.date}</strong><small>{b.time}</small></td>
-              <td><strong>{b.ship}</strong><small>{b.cruiseLine}</small></td>
+              <td className="booking-secondary-column"><strong>{b.ship}</strong><small>{b.cruiseLine}</small></td>
               <td><strong className="tour-name">{b.tour}</strong></td>
               <td><div className="guest-cell"><span className="guest-avatar" style={{'--avatar':b.accent} as React.CSSProperties}>{b.initials}</span><span><strong>{b.customer}</strong><small>{b.country}</small></span></div></td>
               <td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td>
               <td><strong>{b.vehicle}</strong></td>
               <td><strong>{b.driver}</strong></td>
-              <td><strong>{b.price}</strong></td>
+              <td className="booking-secondary-column"><strong>{b.price}</strong></td>
               <td><Status status={b.status}/></td>
             </>}
             <td className="booking-action-column"><button className="row-arrow" onClick={e=>{e.stopPropagation();onSelect?.(b)}} aria-label={`Open booking ${b.id}`}><Icon name="arrow" size={16}/></button></td>
