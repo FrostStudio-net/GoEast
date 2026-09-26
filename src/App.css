@@ -120,26 +120,35 @@
 .resource-table th:last-child,.resource-table td:last-child{width:1%;white-space:nowrap}
 .resource-table tbody tr:hover td:last-child,.clickable-row:hover .booking-action-column,.clickable-row:focus-within .booking-action-column{background:#1e1f1b}
 .booking-action-column{width:48px;min-width:48px;padding-right:9px!important;padding-left:9px!important;text-align:center}
-.bookings-table{width:100%;min-width:0;table-layout:fixed}
+.bookings-table{width:100%;min-width:0;table-layout:auto}
 .bookings-table th,.bookings-table td{padding-right:8px;padding-left:8px;overflow:hidden;text-overflow:ellipsis}
 .bookings-table td>strong,.bookings-table td>small{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bookings-table td>strong{display:block}
 .bookings-table .guest-cell,.bookings-table .guest-cell>span:last-child{min-width:0}
-.bookings-table th:nth-child(1){width:90px}.bookings-table th:nth-child(2){width:88px}.bookings-table th:nth-child(3){width:120px}.bookings-table th:nth-child(5){width:130px}.bookings-table th:nth-child(6){width:54px}.bookings-table th:nth-child(7),.bookings-table th:nth-child(8){width:84px}.bookings-table th:nth-child(9){width:74px}.bookings-table th:nth-child(10){width:92px}
+.bookings-table th:nth-child(1){width:90px}.bookings-table th:nth-child(2){width:88px}.bookings-table th:nth-child(3){width:120px}.bookings-table th:nth-child(4),.bookings-table td:nth-child(4){width:1%}.bookings-table th:nth-child(6){width:54px}.bookings-table th:nth-child(7),.bookings-table th:nth-child(8){width:84px}.bookings-table th:nth-child(9){width:74px}.bookings-table th:nth-child(10){width:92px}
+.bookings-table .tour-name{width:max-content;max-width:clamp(150px,20vw,260px)}
+.bookings-table .guest-cell>span:last-child{max-width:clamp(120px,18vw,220px);overflow:hidden}
 .booking-table-responsive>.table-scroll{overflow-x:hidden}
 
-@media screen and (min-width:961px) and (max-width:1399px){
+@media screen and (min-width:1400px){
+  .bookings-table .tour-name{max-width:clamp(185px,calc(55vw - 585px),260px)}
+  .bookings-table .guest-cell>span:last-child{max-width:clamp(150px,calc(45vw - 480px),220px)}
+}
+
+@media screen and (min-width:1024px) and (max-width:1399px){
   .bookings-table .booking-secondary-column{display:none}
   .bookings-table th:nth-child(2){width:88px}
-  .bookings-table th:nth-child(5){width:115px}
   .bookings-table th:nth-child(6){width:54px}
   .bookings-table th:nth-child(7),.bookings-table th:nth-child(8){width:78px}
   .bookings-table th:nth-child(10){width:88px}
+  .bookings-table .tour-name{max-width:clamp(140px,calc(55vw - 419px),260px)}
+  .bookings-table .guest-cell>span:last-child{max-width:clamp(115px,calc(45vw - 343px),220px)}
   .bookings-table .guest-cell{gap:0}
   .bookings-table .guest-avatar{display:none}
 }
 
 /* Below tablet width, actions and key data live in cards instead of a wide table. */
-@media screen and (max-width:960px){
+@media screen and (max-width:1023px){
   .booking-table-responsive>.table-scroll{display:none}
   .booking-mobile-list{display:flex;flex-direction:column}
   .booking-mobile-card{width:100%;min-width:0;display:flex;flex-direction:column;gap:7px;padding:14px 15px;border:0;border-bottom:1px solid var(--border-soft);background:transparent;color:inherit;text-align:left}
