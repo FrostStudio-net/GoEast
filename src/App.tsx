@@ -338,5 +338,50 @@ function RecordCard({title,wide=false,children}:{title:string;wide?:boolean;chil
 function RecordFields({children}:{children:React.ReactNode}){return <div className="record-fields">{children}</div>}
 function RecordField({label,value,editing=false,wide=false,children}:{label:string;value:string;editing?:boolean;wide?:boolean;children?:React.ReactNode}){return <label className={`record-field ${wide?'wide':''}`}><span>{label}</span>{editing&&children?children:<strong>{value}</strong>}</label>}
 
-function BookingTable({data,compact=false,onSelect,emptyMessage='No bookings match your filters.'}:{data:Booking[];compact?:boolean;onSelect?:(booking:Booking)=>void;emptyMessage?:string}){return <div className="booking-table-responsive"><div className="table-scroll"><table className={compact?'compact':'bookings-table'}><thead><tr>{compact?<><th>CUSTOMER</th><th>TOUR</th><th>DATE & TIME</th><th>GUESTS</th><th>STATUS</th></>:<><th>BOOKING</th><th>DATE / START</th><th>SHIP / CRUISE LINE</th><th>TOUR</th><th>CUSTOMER</th><th>GUESTS</th><th>VEHICLE</th><th>DRIVER</th><th>PRICE</th><th>STATUS</th></>}<th><span className="sr-only">Open</span></th></tr></thead><tbody>{data.map(b=><tr key={b.id} className={onSelect?'clickable-row':''} onClick={()=>onSelect?.(b)} tabIndex={onSelect?0:undefined} onKeyDown={event=>{if(event.currentTarget===event.target&&(event.key==='Enter'||event.key===' '))onSelect?.(b)}}>{compact?<><td><div className="guest-cell"><span className="guest-avatar" style={{'--avatar':b.accent} as React.CSSProperties}>{b.initials}</span><span><strong>{b.customer}</strong><small>{b.id} · {b.country}</small></span></div></td><td><strong className="tour-name">{b.tour}</strong><small className="source">via {b.source}</small></td><td><strong>{b.date}</strong><small>{b.time}</small></td><td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td><td><Status status={b.status}/></td></>:<><td><strong className="booking-id">{b.id}</strong><small>{b.source}</small></td><td><strong>{b.date}</strong><small>{b.time}</small></td><td><strong>{b.ship}</strong><small>{b.cruiseLine}</small></td><td><strong className="tour-name">{b.tour}</strong></td><td><div className="guest-cell"><span className="guest-avatar" style={{'--avatar':b.accent} as React.CSSProperties}>{b.initials}</span><span><strong>{b.customer}</strong><small>{b.country}</small></span></div></td><td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td><td><strong>{b.vehicle}</strong></td><td><strong>{b.driver}</strong></td><td><strong>{b.price}</strong></td><td><Status status={b.status}/></td></>}<td><button className="row-arrow" onClick={e=>{e.stopPropagation();onSelect?.(b)}} aria-label={`Open booking ${b.id}`}><Icon name="arrow" size={16}/></button></td></tr>)}{!data.length&&<tr><td colSpan={compact?6:11} className="empty-state">{emptyMessage}</td></tr>}</tbody></table></div><div className="booking-mobile-list">{data.map(b=><button key={b.id} className="booking-mobile-card" onClick={()=>onSelect?.(b)}><span className="booking-mobile-head"><strong>{b.id}</strong><Status status={b.status}/></span><span className="booking-mobile-tour">{b.tour}</span><span className="booking-mobile-customer">{b.customer}</span><span className="booking-mobile-meta"><span>{b.date} · {b.time}</span><span><Icon name="people" size={14}/>{b.guests}</span></span></button>)}{!data.length&&<div className="booking-mobile-empty">{emptyMessage}</div>}</div></div>}
+function BookingTable({data,compact=false,onSelect,emptyMessage='No bookings match your filters.'}:{data:Booking[];compact?:boolean;onSelect?:(booking:Booking)=>void;emptyMessage?:string}){
+  return <div className="booking-table-responsive">
+    <div className="table-scroll">
+      <table className={compact?'compact':'bookings-table'}>
+        <thead><tr>
+          {compact?<><th>CUSTOMER</th><th>TOUR</th><th>DATE & TIME</th><th>GUESTS</th><th>STATUS</th></>:<><th>BOOKING</th><th>DATE / START</th><th>SHIP / CRUISE LINE</th><th>TOUR</th><th>CUSTOMER</th><th>GUESTS</th><th>VEHICLE</th><th>DRIVER</th><th>PRICE</th><th>STATUS</th></>}
+          <th className="booking-action-column"><span className="sr-only">Open</span></th>
+        </tr></thead>
+        <tbody>
+          {data.map(b=><tr key={b.id} className={onSelect?'clickable-row':''} onClick={()=>onSelect?.(b)} tabIndex={onSelect?0:undefined} onKeyDown={event=>{if(event.currentTarget===event.target&&(event.key==='Enter'||event.key===' '))onSelect?.(b)}}>
+            {compact?<>
+              <td><div className="guest-cell"><span className="guest-avatar" style={{'--avatar':b.accent} as React.CSSProperties}>{b.initials}</span><span><strong>{b.customer}</strong><small>{b.id} · {b.country}</small></span></div></td>
+              <td><strong className="tour-name">{b.tour}</strong><small className="source">via {b.source}</small></td>
+              <td><strong>{b.date}</strong><small>{b.time}</small></td>
+              <td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td>
+              <td><Status status={b.status}/></td>
+            </>:<>
+              <td><strong className="booking-id">{b.id}</strong><small>{b.source}</small></td>
+              <td><strong>{b.date}</strong><small>{b.time}</small></td>
+              <td><strong>{b.ship}</strong><small>{b.cruiseLine}</small></td>
+              <td><strong className="tour-name">{b.tour}</strong></td>
+              <td><div className="guest-cell"><span className="guest-avatar" style={{'--avatar':b.accent} as React.CSSProperties}>{b.initials}</span><span><strong>{b.customer}</strong><small>{b.country}</small></span></div></td>
+              <td><span className="guest-count"><Icon name="people" size={15}/>{b.guests}</span></td>
+              <td><strong>{b.vehicle}</strong></td>
+              <td><strong>{b.driver}</strong></td>
+              <td><strong>{b.price}</strong></td>
+              <td><Status status={b.status}/></td>
+            </>}
+            <td className="booking-action-column"><button className="row-arrow" onClick={e=>{e.stopPropagation();onSelect?.(b)}} aria-label={`Open booking ${b.id}`}><Icon name="arrow" size={16}/></button></td>
+          </tr>)}
+          {!data.length&&<tr><td colSpan={compact?6:11} className="empty-state">{emptyMessage}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+    <div className="booking-mobile-list">
+      {data.map(b=><button key={b.id} className="booking-mobile-card" onClick={()=>onSelect?.(b)}>
+        <span className="booking-mobile-head"><strong>{b.id}</strong><Status status={b.status}/></span>
+        <span className="booking-mobile-tour">{b.tour}</span>
+        <span className="booking-mobile-customer">{b.customer}</span>
+        <span className="booking-mobile-meta"><span>{b.date} · {b.time}</span><span><Icon name="people" size={14}/>{b.guests}</span></span>
+        <span className="booking-mobile-open">Open booking <Icon name="arrow" size={14}/></span>
+      </button>)}
+      {!data.length&&<div className="booking-mobile-empty">{emptyMessage}</div>}
+    </div>
+  </div>
+}
 export default App
