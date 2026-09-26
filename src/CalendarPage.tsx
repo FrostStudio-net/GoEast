@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { findBookingConflicts, hasMissingAssignment } from './lib/schedule'
 import type { Booking } from './types/database'
+import { CustomSelect } from './components/CustomSelect'
 
 type FilterKey='ship'|'tour'|'driver'|'vehicle'
 type CalendarDay={iso:string;day:number;inMonth:boolean;bookings:Booking[]}
@@ -44,7 +45,7 @@ export function CalendarPage({data}:{data:Booking[]}){
 }
 
 function CalendarStat({label,value,warning=false}:{label:string;value:number;warning?:boolean}){return <article className={warning?'has-warning':''}><span>{label}</span><strong>{value}</strong></article>}
-function CalendarFilter({label,value,onChange,all,options}:{label:string;value:string;onChange:(value:string)=>void;all:string;options:string[]}){return <label className="filter-control"><span>{label}</span><select value={value} onChange={event=>onChange(event.target.value)}><option>{all}</option>{options.map(option=><option key={option}>{option}</option>)}</select></label>}
+function CalendarFilter({label,value,onChange,all,options}:{label:string;value:string;onChange:(value:string)=>void;all:string;options:string[]}){return <label className="filter-control"><span>{label}</span><CustomSelect aria-label={label} value={value} onChange={event=>onChange(event.target.value)}><option>{all}</option>{options.map(option=><option key={option}>{option}</option>)}</CustomSelect></label>}
 function CalendarCell({day,today,conflicts,onOpenDay,onOpenBooking}:{day:CalendarDay;today:boolean;conflicts:Map<string,string[]>;onOpenDay:(iso:string)=>void;onOpenBooking:(booking:Booking)=>void}){
   const active=day.bookings.filter(item=>item.status!=='Cancelled'),warnings=warningLabels(active,conflicts),visible=day.bookings.slice(0,3)
   return <article className={`calendar-cell ${day.inMonth?'':'outside-month'} ${today?'is-today':''}`} onClick={()=>onOpenDay(day.iso)} tabIndex={day.inMonth?0:-1} onKeyDown={event=>{if(event.currentTarget===event.target&&day.inMonth&&(event.key==='Enter'||event.key===' '))onOpenDay(day.iso)}}><header><span className="calendar-day-number">{day.day}</span>{day.inMonth&&day.bookings.length>0&&<span className="calendar-day-metrics">{day.bookings.length} booking{day.bookings.length===1?'':'s'} · {active.reduce((total,item)=>total+item.guests,0)} guests</span>}{warnings.length>0&&<span className="calendar-warning" title={warnings.join(' · ')} aria-label={warnings.join(', ')}>!</span>}</header>{day.inMonth&&<div className="calendar-cell-bookings">{visible.map(booking=><BookingPill key={booking.id} booking={booking} conflict={conflicts.has(booking.id)} onClick={()=>onOpenBooking(booking)}/>)}{day.bookings.length>visible.length&&<button className="calendar-more" onClick={event=>{event.stopPropagation();onOpenDay(day.iso)}}>+{day.bookings.length-visible.length} more</button>}</div>}</article>

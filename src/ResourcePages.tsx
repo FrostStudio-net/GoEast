@@ -10,6 +10,7 @@ import type { ConfirmationRequest } from './components/confirmationContext'
 import { useModalAccessibility } from './lib/useModalAccessibility'
 import { clearFormDraft, formDraftKey, useDraftDiscard, useFormDraft } from './lib/useFormDraft'
 import { formatDuration } from './lib/schedule'
+import { CustomSelect } from './components/CustomSelect'
 
 type Refresh = () => Promise<void>
 type Feedback = {kind:'success'|'error';message:string}|null
@@ -82,7 +83,7 @@ function ShipForm({item,lines,saving,onClose,onSave}:{item:ShipRow|null;lines:Re
   const {value:form,setValue:setForm,dirty,clearDraft}=useFormDraft(formDraftKey('ship',item?.id),initial,item?JSON.stringify(item):'new-ship-v1')
   const discard=useDraftDiscard(dirty,clearDraft,onClose,'ship')
   const submit=async(event:FormEvent)=>{event.preventDefault();if(saving||!form.name.trim()||!form.lineId)return;try{await onSave({id:item?.id,name:form.name.trim(),cruise_line_id:form.lineId});clearDraft()}catch{ /* Parent displays the save error. */ }}
-  return <Modal title={item?'Edit ship':'New ship'} onClose={discard}><form className="resource-form" onSubmit={event=>void submit(event)}><div className="resource-form-grid"><Field label="Ship name"><input value={form.name} onChange={event=>setForm(current=>({...current,name:event.target.value}))} required/></Field><Field label="Cruise line"><select value={form.lineId} onChange={event=>setForm(current=>({...current,lineId:event.target.value}))} required><option value="">Select a cruise line</option>{lines.map(line=><option key={line.id} value={line.id}>{line.name}</option>)}</select></Field></div><FormActions saving={saving} onCancel={discard}/></form></Modal>
+  return <Modal title={item?'Edit ship':'New ship'} onClose={discard}><form className="resource-form" onSubmit={event=>void submit(event)}><div className="resource-form-grid"><Field label="Ship name"><input value={form.name} onChange={event=>setForm(current=>({...current,name:event.target.value}))} required/></Field><Field label="Cruise line"><CustomSelect value={form.lineId} onChange={event=>setForm(current=>({...current,lineId:event.target.value}))} required><option value="">Select a cruise line</option>{lines.map(line=><option key={line.id} value={line.id}>{line.name}</option>)}</CustomSelect></Field></div><FormActions saving={saving} onCancel={discard}/></form></Modal>
 }
 function CruiseLineForm({item,saving,onClose,onSave}:{item:CruiseLineRow|null;saving:boolean;onClose:()=>void;onSave:(input:{id?:string;name:string})=>Promise<void>}){
   const initial={name:item?.name||''}
