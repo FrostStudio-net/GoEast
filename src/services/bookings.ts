@@ -12,6 +12,52 @@ const displayDate=(iso:string)=>{const [year,month,day]=iso.split('-');return `$
 const displayStatus=(status:DatabaseBookingStatus):BookingStatus=>`${status[0].toUpperCase()}${status.slice(1)}` as BookingStatus
 const databaseStatus=(status:BookingStatus)=>status.toLowerCase() as DatabaseBookingStatus
 const initials=(value:string)=>value.split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase()
+const BOOKING_NUMBER_RETRIES=8
+const BOOKING_NUMBER_PAGE_SIZE=500
+const BOOKING_NUMBER_ERROR='Could not generate a unique booking number. Please try again.'
+
+function bookingNumberPrefix(serviceDate:string){
+  const date=/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)?serviceDate:new Date().toISOString().slice(0,10)
+  return `GE-${date.slice(2).replaceAll('-','')}`
+}
+
+function formatBookingNumber(prefix:string,sequence:number){return `${prefix}-${String(sequence).padStart(2,'0')}`}
+
+async function getAllBookingNumbersForPrefix(prefix:string){
+  const bookingNumbers:string[]=[]
+  const pattern=`${prefix}-%`
+  let offset=0,total:number|null=null
+  do{
+    const {data,error,count}=await supabase
+      .from('bookings')
+      .select('booking_number',{count:'exact'})
+      .like('booking_number',pattern)
+      .order('booking_number',{ascending:true})
+      .range(offset,offset+BOOKING_NUMBER_PAGE_SIZE-1)
+    if(error)throw new Error(BOOKING_NUMBER_ERROR)
+    if(count===null)throw new Error(BOOKING_NUMBER_ERROR)
+    const page=(data||[]).map(row=>row.booking_number)
+    bookingNumbers.push(...page)
+    offset+=page.length
+    total=count
+    if(page.length===0&&offset<total)throw new Error(BOOKING_NUMBER_ERROR)
+  }while(total===null||offset<total)
+  if(import.meta.env.DEV)console.debug('[GoEast booking numbers]',{pattern,count:bookingNumbers.length,bookingNumbers})
+  return bookingNumbers
+}
+
+async function nextBookingSequence(prefix:string,minimum=1){
+  const bookingNumbers=await getAllBookingNumbersForPrefix(prefix)
+  const highest=bookingNumbers.reduce((max,bookingNumber)=>{
+    const suffix=bookingNumber.slice(prefix.length+1)
+    return /^\d+$/.test(suffix)?Math.max(max,Number(suffix)):max
+  },0)
+  return Math.max(minimum,highest+1)
+}
+
+function isBookingNumberCollision(error:{code?:string;message?:string}|null){
+  return error?.code==='23505'
+}
 
 function mapBooking(row:BookingRow,resources:ResourceOptions,customers:Awaited<ReturnType<typeof getCustomers>>,index:number):Booking{
   const customer=customers.find(item=>item.id===row.customer_id)
@@ -41,18 +87,32 @@ async function resourceIds(booking:Booking){
   }
 }
 
-function bookingPayload(booking:Booking,ids:Awaited<ReturnType<typeof resourceIds>>,customerId:string|null){
-  return {booking_number:booking.id.trim(),status:databaseStatus(booking.status),booked_on:booking.bookingDate||null,service_date:booking.serviceDate,start_time:booking.time,end_time:booking.endTime||null,customer_id:customerId,ship_id:ids.ship_id,tour_id:ids.tour_id,guest_count:booking.guests,vehicle_id:ids.vehicle_id,driver_id:ids.driver_id,guide_id:ids.guide_id,port_or_departure_location:booking.port||null,pickup_location:booking.pickupLocation||null,meeting_instructions:booking.meetingInstructions||null,price:booking.priceValue,currency:booking.currency||'ISK',payment_status:(booking.paymentStatus||'unpaid') as PaymentStatus,internal_notes:booking.notes||null}
+function bookingPayload(booking:Booking,ids:Awaited<ReturnType<typeof resourceIds>>,customerId:string|null,bookingNumber=booking.id.trim()){
+  return {booking_number:bookingNumber,status:databaseStatus(booking.status),booked_on:booking.bookingDate||null,service_date:booking.serviceDate,start_time:booking.time,end_time:booking.endTime||null,customer_id:customerId,ship_id:ids.ship_id,tour_id:ids.tour_id,guest_count:booking.guests,vehicle_id:ids.vehicle_id,driver_id:ids.driver_id,guide_id:ids.guide_id,port_or_departure_location:booking.port||null,pickup_location:booking.pickupLocation||null,meeting_instructions:booking.meetingInstructions||null,price:booking.priceValue,currency:booking.currency||'ISK',payment_status:(booking.paymentStatus||'unpaid') as PaymentStatus,internal_notes:booking.notes||null}
 }
 
 export async function createBooking(booking:Booking):Promise<void>{
-  const validationErrors=validateBooking(booking)
+  const validationErrors=validateBooking({...booking,id:'Generated automatically'})
   if(validationErrors.length)throw new Error(validationErrors.join(' '))
   const ids=await resourceIds(booking)
   if(!ids.tour_id)throw new Error('Unable to save booking: the selected tour is unavailable.')
   const customer=await createCustomer({name:booking.customer,contactPerson:booking.contactPerson,email:booking.email,phone:booking.phone})
-  const {error}=await supabase.from('bookings').insert(bookingPayload(booking,ids,customer.id))
-  if(error){await supabase.from('customers').delete().eq('id',customer.id);throw new Error(`Unable to save booking: ${error.message}`)}
+  try{
+    const prefix=bookingNumberPrefix(booking.serviceDate)
+    let sequence=await nextBookingSequence(prefix)
+    for(let attempt=0;attempt<BOOKING_NUMBER_RETRIES;attempt+=1){
+      const bookingNumber=formatBookingNumber(prefix,sequence)
+      const {error}=await supabase.from('bookings').insert(bookingPayload(booking,ids,customer.id,bookingNumber))
+      if(!error)return
+      if(!isBookingNumberCollision(error))throw new Error(`Unable to save booking: ${error.message}`)
+      sequence=await nextBookingSequence(prefix,sequence+1)
+    }
+    throw new Error(BOOKING_NUMBER_ERROR)
+  }catch(error){
+    await supabase.from('customers').delete().eq('id',customer.id)
+    if(error instanceof Error)throw error
+    throw new Error('Unable to save booking. Please try again.')
+  }
 }
 
 export async function updateBooking(booking:Booking):Promise<void>{
