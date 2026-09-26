@@ -16,6 +16,7 @@ import { ConfirmationProvider } from './components/ConfirmDialog'
 import { useConfirmation } from './components/confirmationContext'
 import { scheduleScrollPageToTop, scrollPageToTop, useBodyScrollLock } from './lib/useBodyScrollLock'
 import { clearFormDraft, formDraftKey, useDraftDiscard, useFormDraft } from './lib/useFormDraft'
+import { getUserIdentity } from './lib/userIdentity'
 import './App.css'
 
 const CalendarPage=lazy(()=>import('./CalendarPage').then(module=>({default:module.CalendarPage})))
@@ -85,12 +86,6 @@ function AuthLoading(){return <main className="auth-page"><div className="app-lo
 function AccessDenied({email}:{email:string}){const [error,setError]=useState(''),[signingOut,setSigningOut]=useState(false);const signOut=async()=>{setSigningOut(true);setError('');try{const {error:nextError}=await supabase.auth.signOut();if(nextError)setError('Unable to sign out. Please try again.')}catch{setError('Unable to sign out. Check your connection and try again.')}finally{setSigningOut(false)}};return <main className="auth-page"><section className="login-card denied-card"><span className="denied-icon">!</span><p className="eyebrow">ACCESS DENIED</p><h1>Admin access required</h1><p>{email} is authenticated but is not registered as a GoEast administrator.</p>{error&&<div className="auth-error">{error}</div>}<button className="secondary-button" onClick={()=>void signOut()} disabled={signingOut}>{signingOut?'Signing out…':'Sign out'}</button></section></main>}
 function AuthError({message}:{message:string}){return <main className="auth-page"><section className="login-card denied-card"><span className="denied-icon">!</span><p className="eyebrow">CONNECTION ERROR</p><h1>Access check unavailable</h1><p>{message}</p><button className="secondary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>}
 
-function userIdentity(user:User){
-  const metadata=user.user_metadata||{},email=user.email||''
-  const displayName=String(metadata.full_name||metadata.name||metadata.display_name||email.split('@')[0]||'Administrator')
-  const parts=displayName.trim().split(/\s+/).filter(Boolean),initials=(parts.length>1?`${parts[0][0]}${parts.at(-1)?.[0]}`:displayName.slice(0,2)).toUpperCase()
-  return {displayName,email,initials:initials||'AD',firstName:parts[0]||'there'}
-}
 function WeatherWidget(){
   const [weather,setWeather]=useState<CurrentWeather|null>(null),[unavailable,setUnavailable]=useState(false)
   useEffect(()=>{const controller=new AbortController();getEgilsstadirWeather(controller.signal).then(value=>setWeather(value)).catch(error=>{if((error as Error).name!=='AbortError')setUnavailable(true)});return()=>controller.abort()},[])
@@ -98,7 +93,7 @@ function WeatherWidget(){
 }
 function OperationsApp({user}:{user:User}){
   const routerNavigate=useNavigate(),location=useLocation()
-  const identity=userIdentity(user)
+  const identity=getUserIdentity(user)
   const sidebarRef=useRef<HTMLElement>(null),menuButtonRef=useRef<HTMLButtonElement>(null),mainRef=useRef<HTMLElement>(null)
   const [menuOpen,setMenuOpen]=useState(false),[bookingRecords,setBookingRecords]=useState<Booking[]>([]),[resources,setResources]=useState<ResourceOptions|null>(null),[customers,setCustomers]=useState<CustomerRow[]>([]),[loading,setLoading]=useState(true),[dataError,setDataError]=useState(''),[signOutError,setSignOutError]=useState(''),[signingOut,setSigningOut]=useState(false)
   const refreshData=async()=>{const [nextResources,nextCustomers]=await Promise.all([getResources(),getCustomers()]),nextBookings=await getBookings(nextResources,nextCustomers);setBookingRecords(nextBookings);setResources(nextResources);setCustomers(nextCustomers)}
