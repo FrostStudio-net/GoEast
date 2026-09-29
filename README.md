@@ -49,9 +49,10 @@ For a new Supabase project:
 
 1. Open the Supabase SQL Editor.
 2. Run `supabase/migrations/202609240001_initial_schema.sql`.
-3. Optionally run `supabase/seed.sql` to add the GoEast example data.
-4. In Authentication → Users, create the first user with email and password.
-5. Copy that user’s UUID and authorize it with:
+3. Run `supabase/migrations/202609290001_add_booking_service_end_date.sql`.
+4. Optionally run `supabase/seed.sql` to add the GoEast example data.
+5. In Authentication → Users, create the first user with email and password.
+6. Copy that user’s UUID and authorize it with:
 
 ```sql
 insert into public.admin_users (user_id)

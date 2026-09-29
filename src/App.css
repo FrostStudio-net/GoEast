@@ -107,6 +107,12 @@
 .resource-modal-scrim,.export-modal-scrim,.confirm-scrim{overscroll-behavior:contain}
 .resource-modal,.export-modal,.confirm-dialog{max-height:calc(100dvh - 44px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .resource-modal>header,.export-modal>header{position:sticky;top:0;z-index:2;background:#191a16}
+.schedule-phase{width:max-content;margin-bottom:3px;padding:2px 5px;border:1px solid #554728;border-radius:4px;background:#242015;color:#d0aa52;font-size:6.5px;font-style:normal;font-weight:700;letter-spacing:.35px;text-transform:uppercase}
+.schedule-phase.phase-ongoing{border-color:#384b39;background:#19231a;color:#91ad87}.schedule-phase.phase-ends{border-color:#3c4951;background:#192126;color:#8fa9b7}
+.calendar-booking{grid-template-columns:48px minmax(0,1fr) auto}.agenda-booking{grid-template-columns:54px minmax(0,1fr) auto 15px}
+
+@media screen and (max-width:1150px){.calendar-booking{grid-template-columns:46px minmax(0,1fr)}}
+@media screen and (max-width:500px){.agenda-booking{grid-template-columns:48px minmax(0,1fr) 13px}}
 
 @media screen and (max-width:760px){
   .resource-modal,.export-modal{max-height:calc(100dvh - 10px)}

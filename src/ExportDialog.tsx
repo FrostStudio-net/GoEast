@@ -5,7 +5,7 @@ import { useModalAccessibility } from './lib/useModalAccessibility'
 
 export function ExportDialog({allBookings,filteredBookings,onClose}:{allBookings:Booking[];filteredBookings:Booking[];onClose:()=>void}){
   const dialogRef=useRef<HTMLElement>(null)
-  const dates=allBookings.map(item=>item.serviceDate).sort(),[startDate,setStartDate]=useState(dates[0]||''),[endDate,setEndDate]=useState(dates.at(-1)||''),[error,setError]=useState('')
+  const startDates=allBookings.map(item=>item.serviceDate).sort(),endDates=allBookings.map(item=>item.serviceEndDate||item.serviceDate).sort(),[startDate,setStartDate]=useState(startDates[0]||''),[endDate,setEndDate]=useState(endDates.at(-1)||''),[error,setError]=useState('')
   const seasonBookings=useMemo(()=>dateRangeBookings(allBookings,startDate,endDate),[allBookings,startDate,endDate])
   const exportFiltered=()=>downloadBookingsCsv(filteredBookings,`goeast-bookings-${new Date().toISOString().slice(0,10)}`)
   const exportSeason=()=>{if(!startDate||!endDate){setError('Select both a start and end date.');return}if(startDate>endDate){setError('The end date must be on or after the start date.');return}setError('');downloadBookingsCsv(seasonBookings,`goeast-season-${startDate}-to-${endDate}`)}
